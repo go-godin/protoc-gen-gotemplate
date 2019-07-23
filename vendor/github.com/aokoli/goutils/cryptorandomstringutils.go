@@ -17,19 +17,16 @@ limitations under the License.
 package goutils
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
-	"math/rand"
+	"math/big"
 	"regexp"
-	"time"
 	"unicode"
 )
 
-// RANDOM provides the time-based seed used to generate random numbers
-var RANDOM = rand.New(rand.NewSource(time.Now().UnixNano()))
-
 /*
-RandomNonAlphaNumeric creates a random string whose length is the number of characters specified.
+CryptoRandomNonAlphaNumeric creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of all characters (ASCII/Unicode values between 0 to 2,147,483,647 (math.MaxInt32)).
 
 Parameter:
@@ -37,14 +34,14 @@ Parameter:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomNonAlphaNumeric(count int) (string, error) {
-	return RandomAlphaNumericCustom(count, false, false)
+func CryptoRandomNonAlphaNumeric(count int) (string, error) {
+	return CryptoRandomAlphaNumericCustom(count, false, false)
 }
 
 /*
-RandomAscii creates a random string whose length is the number of characters specified.
+CryptoRandomAscii creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of characters whose ASCII value is between 32 and 126 (inclusive).
 
 Parameter:
@@ -52,14 +49,14 @@ Parameter:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomAscii(count int) (string, error) {
-	return Random(count, 32, 127, false, false)
+func CryptoRandomAscii(count int) (string, error) {
+	return CryptoRandom(count, 32, 127, false, false)
 }
 
 /*
-RandomNumeric creates a random string whose length is the number of characters specified.
+CryptoRandomNumeric creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of numeric characters.
 
 Parameter:
@@ -67,14 +64,14 @@ Parameter:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomNumeric(count int) (string, error) {
-	return Random(count, 0, 0, false, true)
+func CryptoRandomNumeric(count int) (string, error) {
+	return CryptoRandom(count, 0, 0, false, true)
 }
 
 /*
-RandomAlphabetic creates a random string whose length is the number of characters specified.
+CryptoRandomAlphabetic creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of alpha-numeric characters as indicated by the arguments.
 
 Parameters:
@@ -84,14 +81,14 @@ Parameters:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomAlphabetic(count int) (string, error) {
-	return Random(count, 0, 0, true, false)
+func CryptoRandomAlphabetic(count int) (string, error) {
+	return CryptoRandom(count, 0, 0, true, false)
 }
 
 /*
-RandomAlphaNumeric creates a random string whose length is the number of characters specified.
+CryptoRandomAlphaNumeric creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of alpha-numeric characters.
 
 Parameter:
@@ -99,10 +96,13 @@ Parameter:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomAlphaNumeric(count int) (string, error) {
-	RandomString, err := Random(count, 0, 0, true, true)
+func CryptoRandomAlphaNumeric(count int) (string, error) {
+	if count == 0 {
+		return "", nil
+	}
+	RandomString, err := CryptoRandom(count, 0, 0, true, true)
 	if err != nil {
 		return "", fmt.Errorf("Error: %s", err)
 	}
@@ -113,9 +113,9 @@ func RandomAlphaNumeric(count int) (string, error) {
 
 	if !match {
 		//Get the position between 0 and the length of the string-1  to insert a random number
-		position := rand.Intn(count)
+		position := getCryptoRandomInt(count)
 		//Insert a random number between [0-9] in the position
-		RandomString = RandomString[:position] + string('0'+rand.Intn(10)) + RandomString[position+1:]
+		RandomString = RandomString[:position] + string('0' + getCryptoRandomInt(10)) + RandomString[position + 1:]
 		return RandomString, err
 	}
 	return RandomString, err
@@ -123,7 +123,7 @@ func RandomAlphaNumeric(count int) (string, error) {
 }
 
 /*
-RandomAlphaNumericCustom creates a random string whose length is the number of characters specified.
+CryptoRandomAlphaNumericCustom creates a random string whose length is the number of characters specified.
 Characters will be chosen from the set of alpha-numeric characters as indicated by the arguments.
 
 Parameters:
@@ -133,16 +133,17 @@ Parameters:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
+	error - an error stemming from an invalid parameter within underlying function, CryptoRandom(...)
 */
-func RandomAlphaNumericCustom(count int, letters bool, numbers bool) (string, error) {
-	return Random(count, 0, 0, letters, numbers)
+func CryptoRandomAlphaNumericCustom(count int, letters bool, numbers bool) (string, error) {
+	return CryptoRandom(count, 0, 0, letters, numbers)
 }
 
 /*
-Random creates a random string based on a variety of options, using default source of randomness.
-This method has exactly the same semantics as RandomSeed(int, int, int, bool, bool, []char, *rand.Rand), but
-instead of using an externally supplied source of randomness, it uses the internal *rand.Rand instance.
+CryptoRandom creates a random string based on a variety of options, using using golang's crypto/rand source of randomness.
+If the parameters start and end are both 0, start and end are set to ' ' and 'z', the ASCII printable characters, will be used,
+unless letters and numbers are both false, in which case, start and end are set to 0 and math.MaxInt32, respectively.
+If chars is not nil, characters stored in chars that are between start and end are chosen.
 
 Parameters:
 	count - the length of random string to create
@@ -154,35 +155,9 @@ Parameters:
 
 Returns:
 	string - the random string
-	error - an error stemming from an invalid parameter within underlying function, RandomSeed(...)
-*/
-func Random(count int, start int, end int, letters bool, numbers bool, chars ...rune) (string, error) {
-	return RandomSeed(count, start, end, letters, numbers, chars, RANDOM)
-}
-
-/*
-RandomSeed creates a random string based on a variety of options, using supplied source of randomness.
-If the parameters start and end are both 0, start and end are set to ' ' and 'z', the ASCII printable characters, will be used,
-unless letters and numbers are both false, in which case, start and end are set to 0 and math.MaxInt32, respectively.
-If chars is not nil, characters stored in chars that are between start and end are chosen.
-This method accepts a user-supplied *rand.Rand instance to use as a source of randomness. By seeding a single *rand.Rand instance
-with a fixed seed and using it for each call, the same random sequence of strings can be generated repeatedly and predictably.
-
-Parameters:
-	count - the length of random string to create
-	start - the position in set of chars (ASCII/Unicode decimals) to start at
-	end - the position in set of chars (ASCII/Unicode decimals) to end before
-	letters - if true, generated string may include alphabetic characters
-	numbers - if true, generated string may include numeric characters
-	chars - the set of chars to choose randoms from. If nil, then it will use the set of all chars.
-	random - a source of randomness.
-
-Returns:
-	string - the random string
 	error - an error stemming from invalid parameters: if count < 0; or the provided chars array is empty; or end <= start; or end > len(chars)
 */
-func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars []rune, random *rand.Rand) (string, error) {
-
+func CryptoRandom(count int, start int, end int, letters bool, numbers bool, chars ...rune) (string, error) {
 	if count == 0 {
 		return "", nil
 	} else if count < 0 {
@@ -227,9 +202,9 @@ func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars
 		count--
 		var ch rune
 		if chars == nil {
-			ch = rune(random.Intn(gap) + start)
+			ch = rune(getCryptoRandomInt(gap) + int64(start))
 		} else {
-			ch = chars[random.Intn(gap)+start]
+			ch = chars[getCryptoRandomInt(gap) + int64(start)]
 		}
 
 		if letters && unicode.IsLetter(ch) || numbers && unicode.IsDigit(ch) || !letters && !numbers {
@@ -241,14 +216,14 @@ func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars
 					buffer[count] = ch
 					count--
 					// Insert high surrogate
-					buffer[count] = rune(55296 + random.Intn(128))
+					buffer[count] = rune(55296 + getCryptoRandomInt(128))
 				}
 			} else if ch >= 55296 && ch <= 56191 { // High surrogates range (Partial)
 				if count == 0 {
 					count++
 				} else {
 					// Insert low surrogate
-					buffer[count] = rune(56320 + random.Intn(128))
+					buffer[count] = rune(56320 + getCryptoRandomInt(128))
 					count--
 					// Insert high surrogate
 					buffer[count] = ch
@@ -265,4 +240,12 @@ func RandomSeed(count int, start int, end int, letters bool, numbers bool, chars
 		}
 	}
 	return string(buffer), nil
+}
+
+func getCryptoRandomInt(count int) int64 {
+	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(count)))
+	if err != nil {
+		panic(err)
+	}
+	return nBig.Int64()
 }
