@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/go-godin/protoc-gen-gotemplate/context"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/generator"
 	plugin_go "github.com/golang/protobuf/protoc-gen-go/plugin"
@@ -118,6 +120,8 @@ func main() {
 		}
 	}
 
+	//fileContext := context.FileContext{}
+
 	// Generate the encoders
 	for _, file := range g.Request.GetProtoFile() {
 		if all {
@@ -144,6 +148,24 @@ func main() {
 
 			continue
 		}
+
+		// START GODIN
+		for _, service := range file.GetService() {
+			svcContext := &context.Service{
+				Name:     *service.Name,
+				Package:  *file.Package,
+				Messages: context.ParseMessages(file),
+				Enums:    context.ParseEnums(file),
+			}
+			for _, msg := range svcContext.Messages {
+				log.Print(msg.String())
+			}
+
+			for _, enum := range svcContext.Enums {
+				log.Print(enum.String())
+			}
+
+		// END GODIN
 
 		for _, service := range file.GetService() {
 			encoder := NewGenericServiceTemplateBasedEncoder(templateDir, service, file, debug, destinationDir)

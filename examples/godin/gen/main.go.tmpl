@@ -1,0 +1,16 @@
+package main
+
+import "fmt"
+
+{{$file := .File}}
+
+func main() {
+    {{- range .Service.Method }}
+    fmt.Println("{{ .Name }}({{ .InputType }}) {{ .OutputType }}")
+    {{- range $file.MessageType }}
+    {{- range .Field }}
+    fmt.Println("{{ .Name }} {{ .DefaultValue }}")
+    {{- end }}
+    {{- end }}
+    {{- end }}
+}
